@@ -1,0 +1,13 @@
+---
+# ----------------------------------------------------------------------------------------
+# -- Docs: https://github.com/cluster-apps-on-docker/spark-standalone-cluster-on-docker --
+# ----------------------------------------------------------------------------------------
+version: "3.6"
+
+services:
+
+  frontend:
+    image: code_testing/frontend
+    container_name: frontend
+
+...

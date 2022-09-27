@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# -- Building the Images
+
+
+docker-compose kill
+echo -ne '\n'
+docker container prune -f
+
+cd frontend
+docker build \
+  -f Dockerfile \
+  -t code_testing/frontend  .
+cd ..
