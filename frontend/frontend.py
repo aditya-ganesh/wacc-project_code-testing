@@ -2,6 +2,13 @@ import streamlit as st
 import subprocess
 import io
 import logging
+import pika
+
+
+creds = pika.credentials.PlainCredentials(username='waccproject',password='waccpassword')
+
+
+
 
 uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
 
@@ -41,3 +48,16 @@ if uploaded_file is not None:
         with open('err.txt','r') as err:
             err = err.read()
             exec_output.error(err)
+
+    try:
+        parameters = pika.ConnectionParameters('rabbitmq',5672,'/',creds)
+        connection = pika.BlockingConnection(parameters)
+        channel = connection.channel()
+        channel.queue_declare(queue='frontend-stream')
+        channel.basic_publish(  exchange='',
+                                routing_key='routing_key',
+                                body= 'Hello!')
+        connection.close()
+
+    except:
+        st.exception("RabbitMQ not up yet.")

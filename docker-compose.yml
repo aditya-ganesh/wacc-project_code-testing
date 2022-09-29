@@ -6,8 +6,23 @@ version: "3.6"
 
 services:
 
-  frontend:
-    image: code_testing/frontend
-    container_name: frontend
+    frontend:
+        image: code_testing/frontend
+        container_name: frontend
+        ports:
+            - '8501:8501'
+
+
+    rabbitmq:
+        container_name: rabbitmq
+        image: rabbitmq:3.8-management-alpine
+        environment:
+            - RABBITMQ_DEFAULT_USER=waccproject
+            - RABBITMQ_DEFAULT_PASS=waccpassword
+        ports:
+            # AMQP protocol port
+            - '5672:5672'
+            # HTTP management UI
+            - '15672:15672'
 
 ...
