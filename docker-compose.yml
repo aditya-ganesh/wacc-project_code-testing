@@ -4,14 +4,23 @@
 # ----------------------------------------------------------------------------------------
 version: "3.6"
 
+
+
 services:
 
     frontend:
-        image: code_testing/frontend
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile
         container_name: frontend
         ports:
             - '8501:8501'
 
+    backend:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile
+        container_name: backend
 
     rabbitmq:
         container_name: rabbitmq
