@@ -4,36 +4,81 @@ import io
 import logging
 import pika
 import time
+import json
 
 creds = pika.credentials.PlainCredentials(username='waccproject',password='waccpassword')
 parameters = pika.ConnectionParameters('rabbitmq',5672,'/',creds)
 
 
+uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
+
+filename_placeholder = st.empty()
+code_placeholder = st.empty()
+exec_status = st.empty()
+exec_output = st.empty()
+
+
+connection = None
+channel = None
+
 
 def connect_to_rabbitmq():
+
+    global connection, channel
+
     connected = False
-    connection = None
     while not connected:
         try:
             connection = pika.BlockingConnection(parameters)
             channel = connection.channel()
             channel.queue_declare(queue='frontend-stream')
+            channel.queue_declare(queue='backend-response')
             connected = True
         except:
             logging.warning("Waiting to connect to RabbitMQ")
             time.sleep(2)
-    return connection,channel
 
 
-def process_input(connection,channel):
+
+def update_placeholders(payload):
+
+    global exec_status, exec_output, connection, channel
+
+    exec_params = json.loads(payload)
+    ret = exec_params['retcode']
+
+    if ret == 0:
+        exec_status.success(exec_params['exec_status'])
+        exec_output.success(exec_params['exec_output'])
+    else:
+        exec_status.error(exec_params['exec_status'])
+        exec_output.error(exec_params['exec_output'])
+
+    channel.close()
 
 
-    uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
+def process_backend_message(ch,method,properties,body):
+    logging.warning(" [x] Received %r" % body)
+    update_placeholders(body)
+    
 
-    filename_placeholder = st.empty()
-    code_placeholder = st.empty()
-    exec_status = st.empty()
-    exec_output = st.empty()
+
+def get_execution_response():
+
+    global connection, channel
+
+    if channel is not None:
+        channel.basic_consume(      queue='backend-response',
+                                    auto_ack=True,
+                                    on_message_callback=process_backend_message)
+        logging.warning(' [*] Waiting for messages. To exit press CTRL+C')
+        channel.start_consuming()
+
+
+
+def process_input():
+
+    global connection, channel
 
 
     retval = None
@@ -45,41 +90,16 @@ def process_input(connection,channel):
         code_lines = code_lines.decode("utf-8")
         code_placeholder.code(code_lines,language='python')
 
-        with open('code.py','w') as codefile:
-            codefile.writelines(code_lines)
-
-        logfile = open('log.txt','w')
-        errfile = open('err.txt','w')
-        ret = subprocess.run(['python3', 'code.py'],stdout=logfile,stderr=errfile)
-
-
-        if ret.returncode == 0:
-
-            exec_status = st.success("Code executed successfully")
-            with open('log.txt','r') as log:
-                logs = log.read()
-                exec_output.success(logs)
-
-
-        else:
-
-            exec_status = st.error("Code execution failed")
-            with open('err.txt','r') as err:
-                err = err.read()
-                exec_output.error(err)
-
-
         channel.basic_publish(  exchange='',
                                 routing_key='frontend-stream',
-                                body= 'Hello!')
-        connection.close()
-
+                                body= code_lines)
+        
+        get_execution_response()
 
 
 if __name__ == '__main__':
 
-    channel = None
-
-    connection,channel = connect_to_rabbitmq()
+    connect_to_rabbitmq()
     if channel is not None:
-        process_input(connection,channel)
+        process_input()
+    connection.close()
