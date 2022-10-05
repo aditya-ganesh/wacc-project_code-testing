@@ -9,17 +9,17 @@ version: "3.6"
 services:
 
     frontend:
+        image: frontend
         build:
             context: ./frontend
             dockerfile: Dockerfile
-        container_name: frontend
         ports:
             - '8501:8501'
 
     nginx:
-        container_name: nginx
+        image: nginx_rproxy
         restart: always
-        build: ./nginx
+        build: ./nginx_rproxy
         ports:
             - "80:80"
         depends_on:
@@ -27,13 +27,12 @@ services:
 
 
     backend:
+        image: backend
         build:
             context: ./backend
             dockerfile: Dockerfile
-        container_name: backend
 
     rabbitmq:
-        container_name: rabbitmq
         image: rabbitmq:3.8-management-alpine
         environment:
             - RABBITMQ_DEFAULT_USER=waccproject
