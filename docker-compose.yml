@@ -8,22 +8,33 @@ version: "3.6"
 
 services:
 
-    frontend:
+    web:
+        image: web
+        restart: always
         build:
-            context: ./frontend
+            context: ./web
             dockerfile: Dockerfile
-        container_name: frontend
         ports:
             - '8501:8501'
 
-    backend:
+    nginx:
+        image: nginx_rproxy
+        restart: always
+        build: ./nginx_rproxy
+        ports:
+            - "80:80"
+        depends_on:
+            - web
+
+
+    worker:
+        image: worker
+        restart: always
         build:
-            context: ./backend
+            context: ./worker
             dockerfile: Dockerfile
-        container_name: backend
 
     rabbitmq:
-        container_name: rabbitmq
         image: rabbitmq:3.8-management-alpine
         environment:
             - RABBITMQ_DEFAULT_USER=waccproject
