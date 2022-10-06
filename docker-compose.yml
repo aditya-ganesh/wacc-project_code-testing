@@ -8,10 +8,11 @@ version: "3.6"
 
 services:
 
-    frontend:
-        image: frontend
+    web:
+        image: web
+        restart: always
         build:
-            context: ./frontend
+            context: ./web
             dockerfile: Dockerfile
         ports:
             - '8501:8501'
@@ -23,13 +24,14 @@ services:
         ports:
             - "80:80"
         depends_on:
-            - frontend
+            - web
 
 
-    backend:
-        image: backend
+    worker:
+        image: worker
+        restart: always
         build:
-            context: ./backend
+            context: ./worker
             dockerfile: Dockerfile
 
     rabbitmq:
