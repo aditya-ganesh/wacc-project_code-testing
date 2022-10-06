@@ -39,8 +39,20 @@ services:
             - RABBITMQ_DEFAULT_PASS=waccpassword
         ports:
             # AMQP protocol port
-            - '5672:5672'
+            - '25672:25672'
             # HTTP management UI
             - '15672:15672'
-
+    py-mongo:
+        image: mongodb
+        build:
+            context: ./db
+            dockerfile: Dockerfile
+        volumes:
+            - ./db/mongo-data:/data/db
+            - ./db/mongo-app:/var/www/html
+        ports:
+            - "27017:27017"
+        environment:
+            - MONGO_INITDB_ROOT_USERNAME=root
+            - MONGO_INITDB_ROOT_PASSWORD=1234
 ...

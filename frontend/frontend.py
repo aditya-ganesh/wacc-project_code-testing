@@ -13,7 +13,7 @@ time.sleep(10)
 logging.warning('Begin execution')
 
 
-broker_url = 'amqp://waccproject:waccpassword@rabbitmq:5672'
+broker_url = 'amqp://waccproject:waccpassword@rabbitmq:25672'
 backend_url = 'rpc://'
 
 app = Celery(

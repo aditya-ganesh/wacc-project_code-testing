@@ -5,7 +5,7 @@ import pika
 import json
 
 creds = pika.credentials.PlainCredentials(username='waccproject',password='waccpassword')
-parameters = pika.ConnectionParameters('rabbitmq',5672,'/',creds)
+parameters = pika.ConnectionParameters('rabbitmq',25672,'/',creds)
 
 def connect_to_rabbitmq():
     connected = False
