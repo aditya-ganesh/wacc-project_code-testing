@@ -1,7 +1,12 @@
 FROM debian:latest
 
 RUN apt-get update && apt-get install -y python3 python3-pip
-RUN pip install virtualenv ipykernel numpy pandas streamlit pika celery
+
 COPY web.py /data/web.py
-EXPOSE 8501
+COPY requirements.txt /data/requirements.txt
+
+
+RUN pip install -r /data/requirements.txt
+
+# EXPOSE 8501
 ENTRYPOINT streamlit run /data/web.py
