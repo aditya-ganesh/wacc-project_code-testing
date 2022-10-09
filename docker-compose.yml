@@ -8,24 +8,50 @@ version: "3.6"
 
 services:
 
+
+    rabbitmq:
+        image: rabbitmq:3.8-management-alpine
+        environment:
+            - RABBITMQ_DEFAULT_USER
+            - RABBITMQ_DEFAULT_PASS
+        ports:
+            # AMQP protocol port
+            - '${RABBITMQ_DEFAULT_PORT}:${RABBITMQ_DEFAULT_PORT}'
+            # HTTP management UI
+            - '${RABBITMQ_DEFAULT_MGMT}:${RABBITMQ_DEFAULT_MGMT}'
+
+    mongo:
+        image: mongodb
+        build:
+            context: ./db
+            dockerfile: Dockerfile
+        volumes:
+            - ./db/mongo-data:/data/db
+            - ./db/mongo-app:/var/www/html
+        ports:
+            - "${MONGODB_PORT}:${MONGODB_PORT}"
+        environment:
+            - MONGO_INITDB_ROOT_USERNAME
+            - MONGO_INITDB_ROOT_PASSWORD
+
     web:
         image: web
         restart: always
         build:
             context: ./web
             dockerfile: Dockerfile
-        ports:
-            - '8501:8501'
+        environment:
+            - APISERV_PORT
 
-    nginx:
+    nginx_rproxy:
         image: nginx_rproxy
         restart: always
         build: ./nginx_rproxy
         ports:
-            - "80:80"
+            - '${NGINX_PORT}:${NGINX_PORT}'
         depends_on:
             - web
-
+        
 
     worker:
         image: worker
@@ -33,16 +59,39 @@ services:
         build:
             context: ./worker
             dockerfile: Dockerfile
-
-    rabbitmq:
-        image: rabbitmq:3.8-management-alpine
+        depends_on:
+            - rabbitmq
+            - mongo
         environment:
-            - RABBITMQ_DEFAULT_USER=waccproject
-            - RABBITMQ_DEFAULT_PASS=waccpassword
+            - RABBITMQ_DEFAULT_USER
+            - RABBITMQ_DEFAULT_PASS
+            - RABBITMQ_DEFAULT_PORT
+            - MONGO_INITDB_ROOT_USERNAME
+            - MONGO_INITDB_ROOT_PASSWORD
+            - MONGODB_PORT
+
+
+    apiserv:
+        image: apiserv
+        restart: always
+        build:
+            context: ./apiserv
+            dockerfile: Dockerfile
         ports:
-            # AMQP protocol port
-            - '5672:5672'
-            # HTTP management UI
-            - '15672:15672'
+            - '${APISERV_PORT}:${APISERV_PORT}'
+        depends_on:
+            - worker
+            - mongo
+        environment:
+            - RABBITMQ_DEFAULT_USER
+            - RABBITMQ_DEFAULT_PASS
+            - RABBITMQ_DEFAULT_PORT
+            - MONGO_INITDB_ROOT_USERNAME
+            - MONGO_INITDB_ROOT_PASSWORD
+            - MONGODB_PORT
+            - REFCODE_LENGTH
+
+
+
 
 ...

@@ -2,100 +2,83 @@ import streamlit as st
 import logging
 import time
 import json
+import requests
+import os
 
-logging.basicConfig(level=logging.INFO)
-
-from celery import Celery
-
-rabbitmq_user = 'waccproject'
-rabbitmq_pass = 'waccpassword'
-rabbitmq_port = 5672
-
-broker_url = f'amqp://{rabbitmq_user}:{rabbitmq_pass}@rabbitmq:{rabbitmq_port}'
-backend_url = 'rpc://'
-
-celery_app = None
-
-title = st.title("Code Tester")
-uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
-
-filename_placeholder = st.empty()
-code_placeholder = st.empty()
-wait_placeholder = st.empty()
-exec_status = st.empty()
-exec_output = st.empty()
+api_port = os.environ['APISERV_PORT']
 
 
+assignments = [1,2]
+
+title_placeholder = st.empty()
 
 
-def connect_to_rabbitmq():
+def upload_submission():
 
-    global celery_app
-
-    while celery_app is None:
-        try:
-                celery_app = Celery(
-                    'celery_app',
-                    broker=broker_url,
-                    backend = backend_url   )
-        except:
-            logging.info("Waiting to connect to RabbitMQ")
-            time.sleep(2)
-
-
-
-def update_placeholders(payload):
-
-    global exec_status, exec_output
-
-    logging.info("Received : {}".format(payload))
-
-    ret = payload['retcode']
-
-    wait_placeholder = st.empty()
-
-    if ret == 0:
-        exec_status.success(payload['exec_status'])
-        exec_output.success(payload['exec_output'])
-    else:
-        exec_status.error(payload['exec_status'])
-        exec_output.error(payload['exec_output'])
-
-
-
-def get_execution_response(task):
-
-    global celery_app
-
-    if celery_app is not None:
-        logging.info("Getting task results")
-        payload = task.get()
-        update_placeholders(payload)
-
-
-def process_input():
-
-    global celery_app
-
+    submission_code = st.selectbox("Choose an assignment",assignments)
+    uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
+ 
     if uploaded_file is not None:
 
-        filename_placeholder.header(uploaded_file.name)
         code_lines = uploaded_file.read()
         code_lines = code_lines.decode("utf-8")
-        code_placeholder.code(code_lines,language='python')
 
-        code_id = 'code'
+        st.header(uploaded_file.name)
+        st.code(code_lines,language='python')
 
-        logging.info("Sending task to celery")
-        task = celery_app.send_task('processPython', (code_id,code_lines))
+        payload = {
+            'submission'    : submission_code,
+            'filename'      : uploaded_file.name,
+            'data'          : code_lines             
+        }
 
-        # wait_placeholder.spinner("Waiting for execution output")
-        
-        get_execution_response(task)
+        st.write(payload)
+
+        try:
+
+            res = requests.post(url=f'http://apiserv:{api_port}/sendfile',json=payload)
+
+            if res.ok:
+
+                ret = res.json()
+                st.write(ret)
+                if ret['status'] == 0:
+                    
+                    st.success("File uploaded! Your reference ID is")
+                    st.header(ret['id'])
+                else:
+                    st.error(f"Something went wrong, please try again.\nError code : {ret['status']}")
+        except:
+            st.error("Something went wrong. Please try again")
+
+
+def view_result():
+
+    code_id = st.text_input("Enter your reference ID")
+    if code_id != "":
+        res = requests.get(url=f'http://apiserv:{api_port}/getstatus/{code_id}')
+        res = res.json()
+
+        if res['status'] == 0:
+            st.header('{} - {}'.format(res['code_id'],res['filename']))
+            st.code(res['code_lines'],language='python')
+
+            if res['execution']['retcode'] == 0:
+                st.success('No execution errors')
+            else:
+                st.error('Execution failed. Traceback below')
+            st.info(res['execution']['exec_output'])
+
 
 
 if __name__ == '__main__':
 
-    connect_to_rabbitmq()
-    if celery_app is not None:
-        process_input()
+        title_placeholder.title("Code Testing Platform")
+
+        sitepages = {
+            "Upload a submission" : upload_submission,
+            "View a result" : view_result
+        }
+
+        page_selection = st.sidebar.selectbox("I want to...",sitepages.keys())
+        sitepages[page_selection]()
