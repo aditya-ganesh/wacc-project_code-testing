@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+import motor
 
 def create_db():
  
@@ -6,8 +6,7 @@ def create_db():
    CONNECTION_STRING = "mongodb+srv://admin:ZIDA6eai8UbEn0gz@cluster0.rftianv.mongodb.net/test"
  
    # Create a connection using MongoClient. You can import MongoClient or use pymongo.MongoClient
-   client = MongoClient(CONNECTION_STRING)
- 
+   client = motor.motor_tornado.MotorClient(CONNECTION_STRING) 
    # Create the database for our example (we will use the same database throughout the tutorial
    return client['user_shopping_list']
   

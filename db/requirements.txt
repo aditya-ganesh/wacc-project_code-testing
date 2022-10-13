@@ -1,1 +1,3 @@
-pymongo[srv]
+motor[srv]
+tornado
+nest-asyncio

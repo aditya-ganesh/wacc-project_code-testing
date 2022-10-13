@@ -9,7 +9,11 @@ import random
 import string
 
 from celery import Celery
-from pymongo import MongoClient
+import motor
+import tornado
+import tornado.web
+import nest_asyncio
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -29,18 +33,35 @@ mongodb_user = os.environ['MONGO_INITDB_ROOT_USERNAME']
 mongodb_pass = os.environ['MONGO_INITDB_ROOT_PASSWORD']
 mongodb_port = os.environ['MONGODB_PORT']
 
+# tornado_port = os.environ['TORNADO_PORT']
+
+
 code_len = int(os.environ['REFCODE_LENGTH'])
 
 
 
 
-mongo_db = MongoClient('mongo',
+mongo_db = motor.motor_tornado.MotorClient('mongo',
                             username=mongodb_user,
                             password=mongodb_pass,
                             )
 
 db = mongo_db['CodeTesting']
 submissions = db['Submissions']
+
+class MainHandler(tornado.web.RequestHandler):
+    def get(self):
+        db = self.settings['db']
+
+tornado_app = tornado.web.Application([
+    (r'/', MainHandler)
+], db=db)
+
+nest_asyncio.apply()
+
+# using env tornado_port resulted in a key error
+tornado_app.listen(8888)
+tornado.ioloop.IOLoop.current().start()
 
 broker_url = f'amqp://{rabbitmq_user}:{rabbitmq_pass}@rabbitmq:{rabbitmq_port}'
 backend_url = 'rpc://'
@@ -65,6 +86,8 @@ async def root():
     return {"message": "Hello World"}
 
 
+async def do_insert(document):
+    return await db.submissions.insert_one(document)
 
 @api_app.post("/sendfile")
 def send_file(submission: codeSubmission):
@@ -89,7 +112,7 @@ def send_file(submission: codeSubmission):
     
     logging.info("Adding submission to mongo")
     try:
-        db.submissions.insert_one(db_insert)
+        tornado.ioloop.IOLoop.current().run_sync(do_insert(db_insert))
     except:
         logging.error("Adding to mongo failed")
         return_params['status'] = -1
@@ -104,6 +127,8 @@ def send_file(submission: codeSubmission):
     return return_params
 
 
+async def do_find(code_id):
+    return await db.submissions.find_one({'id' : code_id})
 
 
 @api_app.get("/getstatus/{code_id}")
@@ -113,7 +138,7 @@ def get_status(code_id):
     }
     logging.info(f"Reading mongo for entry {code_id}")
     try:
-        queryres = db.submissions.find_one({'id' : code_id})
+        queryres = tornado.ioloop.IOLoop.current().run_sync(do_find(code_id))
         logging.info(f"Retrieved : {queryres}")
 
         entry = {

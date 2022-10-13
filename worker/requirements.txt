@@ -1,3 +1,5 @@
 virtualenv
 celery
-pymongo
+motor[srv]
+tornado
+nest-asyncio

@@ -4,7 +4,10 @@ import time
 import json
 import os
 
-from pymongo import MongoClient
+import motor
+import tornado 
+import tornado.web
+import nest_asyncio
 
 logging.basicConfig(level=logging.INFO)
 
@@ -29,7 +32,7 @@ celery_app = Celery(
     
 )
 
-mongo_db = MongoClient('mongo',
+mongo_db = motor.motor_tornado.MotorClient('mongo',
                             username=mongodb_user,
                             password=mongodb_pass,
                             )
@@ -37,6 +40,23 @@ mongo_db = MongoClient('mongo',
 db = mongo_db['CodeTesting']
 submissions = db['Submissions']
 
+class MainHandler(tornado.web.RequestHandler):
+    def get(self):
+        db = self.settings['db']
+
+tornado_app = tornado.web.Application([
+    (r'/', MainHandler)
+], db=db)
+
+nest_asyncio.apply()
+
+# using env tornado_port resulted in a key error
+tornado_app.listen(8888)
+tornado.ioloop.IOLoop.current().start()
+
+
+async def do_update(payload):
+    return await db.submissions.update_one(payload)
 
 
 @celery_app.task(name='processPython')
@@ -75,7 +95,7 @@ def procesPython(code_id,code_lines):
     logging.info(" [x] Sending return params to mongo : {}".format(exec_params) )
 
     try:
-        db.submissions.update_one({'id' : code_id},{"$set":{'execution':exec_params}})
+        queryres = tornado.ioloop.IOLoop.current().run_sync(do_update({'id' : code_id},{"$set":{'execution':exec_params}}))
         logging.info(f"Execution output written : {entry}")
     except:
         logging.error("Could not write entry")
