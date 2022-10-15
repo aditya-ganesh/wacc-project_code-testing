@@ -4,5 +4,5 @@ celery
 python-multipart
 pydantic
 motor[srv]
-tornado
+asyncio
 nest-asyncio

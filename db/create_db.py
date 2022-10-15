@@ -1,13 +1,12 @@
-import motor
+import motor.motor_asyncio
 
 def create_db():
  
    # Provide the mongodb atlas url to connect python to mongodb using pymongo
    CONNECTION_STRING = "mongodb+srv://admin:ZIDA6eai8UbEn0gz@cluster0.rftianv.mongodb.net/test"
  
-   # Create a connection using MongoClient. You can import MongoClient or use pymongo.MongoClient
-   client = motor.motor_tornado.MotorClient(CONNECTION_STRING) 
-   # Create the database for our example (we will use the same database throughout the tutorial
+   client = motor.motor_asyncio.AsyncIOMotorClient(CONNECTION_STRING) 
+
    return client['user_shopping_list']
   
 # This is added so that many files can reuse the function get_database()

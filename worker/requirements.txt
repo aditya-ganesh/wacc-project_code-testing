@@ -1,5 +1,5 @@
 virtualenv
 celery
 motor[srv]
-tornado
+asyncio
 nest-asyncio

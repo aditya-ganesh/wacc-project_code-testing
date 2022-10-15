@@ -9,4 +9,4 @@ RUN pip install -r requirements.txt
 
 # EXPOSE 27017
 
-# ENTRYPOINT python3 /data/create_db.py
+ENTRYPOINT python3 /data/create_db.py
