@@ -7,7 +7,6 @@ import os
 
 api_port = os.environ['APISERV_PORT']
 
-
 assignments = [1,2]
 
 title_placeholder = st.empty()
@@ -59,15 +58,25 @@ def view_result():
         res = requests.get(url=f'http://apiserv:{api_port}/getstatus/{code_id}')
         res = res.json()
 
+        st.write(res)
+
         if res['status'] == 0:
             st.header('{} - {}'.format(res['code_id'],res['filename']))
             st.code(res['code_lines'],language='python')
 
-            if res['execution']['retcode'] == 0:
-                st.success('No execution errors')
-            else:
-                st.error('Execution failed. Traceback below')
-            st.info(res['execution']['exec_output'])
+            test_results = res['execution']
+
+            for i in range(len(test_results)):
+
+                result = test_results[f'test case {i}']
+                if result['retcode'] == 0:
+                    if result['status'] == 'successful':
+                        st.success(f"Case {i} : Passed\nnExpected : {result['expected_output']}\tGot : {result['exec_output']}")
+                    else:
+                        st.warning(f"Case {i} : Failed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
+                else:
+                    st.error(f'Case {i} : Execution failed. Traceback below')
+                    st.info(res['execution']['exec_output'])
 
 
 

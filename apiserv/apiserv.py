@@ -86,20 +86,12 @@ def send_file(submission: codeSubmission):
     }
 
 
-    
-    logging.info("Adding submission to mongo")
-    try:
-        db.submissions.insert_one(db_insert)
-    except:
-        logging.error("Adding to mongo failed")
-        return_params['status'] = -1
-
     logging.info("Sending task to celery")
     try:
-        task = celery_app.send_task('processPython', (code_id,submission.data))
+        task = celery_app.send_task('testRunner', (code_id,submission.filename,submission.data))
     except:
         logging.error("Sending to celery failed")
-        return_params['status'] = -2
+        return_params['status'] = -1
 
     return return_params
 

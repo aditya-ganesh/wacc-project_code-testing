@@ -16,9 +16,9 @@ services:
             - RABBITMQ_DEFAULT_PASS
         ports:
             # AMQP protocol port
-            - '${RABBITMQ_DEFAULT_PORT}:${RABBITMQ_DEFAULT_PORT}'
+            - "${RABBITMQ_DEFAULT_PORT}:${RABBITMQ_DEFAULT_PORT}"
             # HTTP management UI
-            - '${RABBITMQ_DEFAULT_MGMT}:${RABBITMQ_DEFAULT_MGMT}'
+            - "${RABBITMQ_DEFAULT_MGMT}:${RABBITMQ_DEFAULT_MGMT}"
 
     mongo:
         image: mongodb
@@ -36,7 +36,6 @@ services:
 
     web:
         image: web
-        restart: always
         build:
             context: ./web
             dockerfile: Dockerfile
@@ -45,17 +44,15 @@ services:
 
     nginx_rproxy:
         image: nginx_rproxy
-        restart: always
         build: ./nginx_rproxy
         ports:
-            - '${NGINX_PORT}:${NGINX_PORT}'
+            - "${NGINX_PORT}:${NGINX_PORT}"
         depends_on:
             - web
         
 
     worker:
         image: worker
-        restart: always
         build:
             context: ./worker
             dockerfile: Dockerfile
@@ -73,12 +70,11 @@ services:
 
     apiserv:
         image: apiserv
-        restart: always
         build:
             context: ./apiserv
             dockerfile: Dockerfile
         ports:
-            - '${APISERV_PORT}:${APISERV_PORT}'
+            - "${APISERV_PORT}:${APISERV_PORT}"
         depends_on:
             - worker
             - mongo
