@@ -7,14 +7,15 @@ import os
 
 api_port = os.environ['APISERV_PORT']
 
-assignments = [1,2]
-
 title_placeholder = st.empty()
 
 
 def upload_submission():
 
-    submission_code = st.selectbox("Choose an assignment",assignments)
+    assignments = requests.get(url=f'http://apiserv:{api_port}/getassignments/')
+    assignments = assignments.json()
+
+    assignment_code = st.selectbox("Choose an assignment",assignments)
     uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
  
     if uploaded_file is not None:
@@ -26,12 +27,10 @@ def upload_submission():
         st.code(code_lines,language='python')
 
         payload = {
-            'submission'    : submission_code,
+            'assignment'    : assignment_code,
             'filename'      : uploaded_file.name,
             'data'          : code_lines             
         }
-
-        st.write(payload)
 
         try:
 
@@ -40,7 +39,7 @@ def upload_submission():
             if res.ok:
 
                 ret = res.json()
-                st.write(ret)
+
                 if ret['status'] == 0:
                     
                     st.success("File uploaded! Your reference ID is")
@@ -58,8 +57,6 @@ def view_result():
         res = requests.get(url=f'http://apiserv:{api_port}/getstatus/{code_id}')
         res = res.json()
 
-        st.write(res)
-
         if res['status'] == 0:
             st.header('{} - {}'.format(res['code_id'],res['filename']))
             st.code(res['code_lines'],language='python')
@@ -68,16 +65,18 @@ def view_result():
 
             for i in range(len(test_results)):
 
-                result = test_results[f'test case {i}']
-                if result['retcode'] == 0:
-                    if result['status'] == 'successful':
-                        st.success(f"Case {i} : Passed\nnExpected : {result['expected_output']}\tGot : {result['exec_output']}")
+                result = test_results[f'test case {i+1}']
+                if result['status'] != 'not_started':
+                    if result['retcode'] == 0:
+                        if result['status'] == 'successful':
+                            st.success(f"Case {i} : Passed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
+                        else:
+                            st.warning(f"Case {i} : Failed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
                     else:
-                        st.warning(f"Case {i} : Failed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
+                        st.error(f'Case {i} : Execution failed. Traceback below')
+                        st.error(res['exec_output'])
                 else:
-                    st.error(f'Case {i} : Execution failed. Traceback below')
-                    st.info(res['execution']['exec_output'])
-
+                    st.info(f"Case {i} : Pending execution")
 
 
 if __name__ == '__main__':

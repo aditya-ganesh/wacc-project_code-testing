@@ -22,17 +22,32 @@ services:
 
     mongo:
         image: mongodb
-        build:
-            context: ./db
-            dockerfile: Dockerfile
         volumes:
             - ./db/mongo-data:/data/db
             - ./db/mongo-app:/var/www/html
+            - ./db/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
         ports:
             - "${MONGODB_PORT}:${MONGODB_PORT}"
         environment:
             - MONGO_INITDB_ROOT_USERNAME
             - MONGO_INITDB_ROOT_PASSWORD
+            - MONGODB_PORT
+            - DROP_EXISTING
+            - WRITE_CASES
+
+    dbinit:
+        image: dbinit
+        build:
+            context: ./dbinit
+            dockerfile: Dockerfile
+        environment:
+            - MONGO_INITDB_ROOT_USERNAME
+            - MONGO_INITDB_ROOT_PASSWORD
+            - MONGODB_PORT
+            - DROP_EXISTING
+            - WRITE_CASES
+        depends_on:
+            - mongo
 
     web:
         image: web

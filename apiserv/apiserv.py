@@ -14,7 +14,7 @@ from pymongo import MongoClient
 logging.basicConfig(level=logging.INFO)
 
 class codeSubmission(BaseModel):
-    submission    : str
+    assignment    : str
     filename      : str
     data          : str       
 
@@ -41,6 +41,7 @@ mongo_db = MongoClient('mongo',
 
 db = mongo_db['CodeTesting']
 submissions = db['Submissions']
+test_cases = db['TestCases']
 
 broker_url = f'amqp://{rabbitmq_user}:{rabbitmq_pass}@rabbitmq:{rabbitmq_port}'
 backend_url = 'rpc://'
@@ -64,7 +65,20 @@ api_app = FastAPI()
 async def root():
     return {"message": "Hello World"}
 
+@api_app.get("/getassignments")
+async def get_assignments():
+    entry = {
+        'status' : -1
+    }
+    logging.info(f"Reading mongo for assignments")
+    # try:
+    queryres = db.test_cases.distinct('assignment')
+    logging.info(f"Retrieved : {queryres}")
+    entry = queryres
+    # except:
+    #     logging.error("Reading from mongo failed")
 
+    return entry
 
 @api_app.post("/sendfile")
 def send_file(submission: codeSubmission):
@@ -75,20 +89,14 @@ def send_file(submission: codeSubmission):
 
     return_params = {
         'status'    :   0,
-        "filename"  :   submission.filename,
-        "id"        :   code_id
+        'assignment'    : submission.assignment,
+        'filename'  :   submission.filename,
+        'id'        :   code_id
     }
-
-    db_insert = {
-        'filename'      :       submission.filename,
-        'id'            :       code_id,
-        'data'          :       submission.data
-    }
-
 
     logging.info("Sending task to celery")
     try:
-        task = celery_app.send_task('testRunner', (code_id,submission.filename,submission.data))
+        task = celery_app.send_task('testRunner', (code_id,submission.assignment,submission.filename,submission.data))
     except:
         logging.error("Sending to celery failed")
         return_params['status'] = -1

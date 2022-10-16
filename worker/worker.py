@@ -23,7 +23,6 @@ mongodb_port = os.environ['MONGODB_PORT']
 broker_url = f'amqp://{rabbitmq_user}:{rabbitmq_pass}@rabbitmq:{rabbitmq_port}'
 backend_url = 'rpc://'
 
-num_cases = 5
 
 celery_app = Celery(
     'celery_app',
@@ -41,24 +40,26 @@ def connectToMongo():
 
 
 @celery_app.task(name='createDBEntry')
-def createDBEntry(code_id,filename,code_lines):
+def createDBEntry(code_id,filename,code_lines,assignment,num_cases=5):
 
     test_cases = {}
     
     for i in range(num_cases):
-        test_cases[f'test case {i}'] = {'status' : 'not_started'}
+        test_cases[f'test case {i+1}'] = {'status' : 'not_started'}
 
     db_insert = {
         'filename'      :       filename,
         'id'            :       code_id,
+        'assignment'    :       assignment,
         'data'          :       code_lines,
         'execution'     :       test_cases
     }
-    mongo_db = connectToMongo()
-
-    db = mongo_db['CodeTesting']
-    submissions = db['Submissions']
     try:
+        mongo_db = connectToMongo()
+        db = mongo_db['CodeTesting']
+        submissions = db['Submissions']
+        test_case_coll = db['TestCases']
+
         logging.info(f"Writing entry {code_id} to mongo")
         db.submissions.insert_one(db_insert)
     except:
@@ -68,24 +69,37 @@ def createDBEntry(code_id,filename,code_lines):
 
 
 @celery_app.task(name='testRunner')
-def testRunner(code_id,filename,code_lines):
+def testRunner(code_id,assignment,filename,code_lines):
 
     logging.info(" [x] Received main task : {}".format(code_id) )
 
-    createDBEntry.delay(code_id, filename, code_lines)
+    mongo_db = connectToMongo()
+    db = mongo_db['CodeTesting']
+    cases = db['TestCases']
+    res =  db.test_cases.find_one({'assignment': assignment})
+    logging.info(f"Found test cases : {res}")
+    test_cases = res['test_cases']
+
+    createDBEntry.delay(code_id, filename, code_lines,assignment,len(test_cases))
+
+    
 
     codefile = f'{code_id}.py' 
     with open(codefile,'w') as codefile:
         codefile.writelines(code_lines)
     codefile.close()
 
-    for i in range(num_cases):
-        testCase.delay(code_id,i,i)
+    # TODO : Change iterator to take each test case
+
+    for i in range(1,len(test_cases)+1):
+        case = test_cases[f'test case {i}']
+        logging.info(f"Taking test case : {case}")
+        testCase.delay(code_id,i,case)
 
     return
 
 @celery_app.task(name='testCase')
-def testCase(code_id,index,expected):
+def testCase(code_id,index,test_case):
     
     logging.info(" [x] Received subtask {}, {}".format(code_id,index) )
 
@@ -96,7 +110,24 @@ def testCase(code_id,index,expected):
     logwriter = open(logfile,'w')
     errwriter = open(errfile,'w')
 
-    ret = subprocess.run(['python3',codefile],stdout=logwriter,stderr=errwriter)
+    process_call = ['python3',codefile]
+
+    print(f"Using inputs : {test_case['inputs']}")
+
+    logging.info(f"Number of inputs : {len(test_case['inputs'])}")
+    logging.info(f"Type of input : {type(test_case['inputs'])}")
+
+    if type(test_case['inputs']) == str:
+        process_call.append(test_case['inputs'])
+    else:
+        for input in test_case['inputs']:
+            process_call.append(str(input))
+
+    
+    logging.info(f"Starting execution : {process_call}")
+
+
+    ret = subprocess.run(process_call,stdout=logwriter,stderr=errwriter)
 
     logwriter.close()
     errwriter.close()
@@ -104,8 +135,11 @@ def testCase(code_id,index,expected):
     if ret.returncode == 0:
         with open(logfile,'r') as log:
             exec_output = log.read()
-            vartype = type(expected)
-            exec_output = vartype(exec_output)
+
+            if type(test_case['outputs']) in [int, float]:
+                exec_output = float(exec_output)
+            elif type(test_case['outputs']) == str:
+                exec_output = exec_output[:-1]
 
     else:
         with open(errfile,'r') as err:
@@ -115,10 +149,10 @@ def testCase(code_id,index,expected):
         'status'            : 'successful',
         'retcode'           : ret.returncode,  
         'exec_output'       : exec_output,
-        'expected_output'   : expected 
+        'expected_output'   : test_case['outputs'] 
     }
 
-    if exec_output != expected:
+    if exec_output != test_case['outputs'] :
         exec_params['status'] = 'mismatch'
 
     os.remove(logfile) 
