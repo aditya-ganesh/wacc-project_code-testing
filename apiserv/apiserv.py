@@ -8,7 +8,9 @@ import os
 import random
 import string
 
-from celery import Celery
+from celery_common.tasks import testCallerTask, databaseHandlerTask
+from celery_common.utils import create_worker_from, connectToMongo
+
 from pymongo import MongoClient
 
 logging.basicConfig(level=logging.INFO)
@@ -25,32 +27,9 @@ rabbitmq_user = os.environ['RABBITMQ_DEFAULT_USER']
 rabbitmq_pass = os.environ['RABBITMQ_DEFAULT_PASS']
 rabbitmq_port = os.environ['RABBITMQ_DEFAULT_PORT']
 
-mongodb_user = os.environ['MONGO_INITDB_ROOT_USERNAME']
-mongodb_pass = os.environ['MONGO_INITDB_ROOT_PASSWORD']
-mongodb_port = os.environ['MONGODB_PORT']
 
 code_len = int(os.environ['REFCODE_LENGTH'])
 
-
-
-
-mongo_db = MongoClient('mongo',
-                            username=mongodb_user,
-                            password=mongodb_pass,
-                            )
-
-db = mongo_db['CodeTesting']
-submissions = db['Submissions']
-test_cases = db['TestCases']
-
-broker_url = f'amqp://{rabbitmq_user}:{rabbitmq_pass}@rabbitmq:{rabbitmq_port}'
-backend_url = 'rpc://'
-
-celery_app = Celery(
-                    'celery_app',
-                    broker=broker_url,
-                    backend = backend_url)
-    
 
 
 
@@ -65,6 +44,7 @@ api_app = FastAPI()
 async def root():
     return {"message": "Hello World"}
 
+
 @api_app.get("/getassignments")
 async def get_assignments():
     entry = {
@@ -72,6 +52,9 @@ async def get_assignments():
     }
     logging.info(f"Reading mongo for assignments")
     # try:
+    mongo_db = connectToMongo()
+    db = mongo_db['CodeTesting']
+    test_cases = db['TestCases']
     queryres = db.test_cases.distinct('assignment')
     logging.info(f"Retrieved : {queryres}")
     entry = queryres
@@ -79,6 +62,7 @@ async def get_assignments():
     #     logging.error("Reading from mongo failed")
 
     return entry
+
 
 @api_app.post("/sendfile")
 def send_file(submission: codeSubmission):
@@ -94,16 +78,38 @@ def send_file(submission: codeSubmission):
         'id'        :   code_id
     }
 
-    logging.info("Sending task to celery")
-    try:
-        task = celery_app.send_task('testRunner', (code_id,submission.assignment,submission.filename,submission.data))
-    except:
-        logging.error("Sending to celery failed")
-        return_params['status'] = -1
+    payload = {
+        'id' : code_id,
+        'assignment' : submission.assignment,
+        'filename'   : submission.filename,
+        'code_lines' : submission.data,
+    }
+
+    db_insert = {
+        'filename'      :       submission.filename,
+        'id'            :       code_id,
+        'assignment'    :       submission.assignment,
+        'data'          :       submission.data
+    }
+
+    _, test_caller = create_worker_from(testCallerTask)
+    
+
+    logging.info("Creating initial DB entry")
+    
+
+    mongo_db = connectToMongo()
+    db = mongo_db['CodeTesting']
+    submissions = db['Submissions']
+    db.submissions.insert_one(db_insert)
+
+    logging.info("Sending test caller task to celery")
+    test_caller.apply_async(args=[payload,])
+
+
+
 
     return return_params
-
-
 
 
 @api_app.get("/getstatus/{code_id}")
@@ -112,19 +118,14 @@ def get_status(code_id):
         'status' : -1
     }
     logging.info(f"Reading mongo for entry {code_id}")
-    try:
-        queryres = db.submissions.find_one({'id' : code_id})
-        logging.info(f"Retrieved : {queryres}")
+   
+    mongo_db = connectToMongo()
+    db = mongo_db['CodeTesting']
+    submissions = db['Submissions']
 
-        entry = {
-            'status'        : 0,
-            'filename'      : queryres['filename'],
-            'code_id'       : queryres['id'],
-            'code_lines'    : queryres['data'],
-            'execution'     : queryres['execution']
-        }
+    queryres = db.submissions.find_one({'id' : code_id})
+    if queryres is not None:
+        queryres.pop('_id')
+    logging.info(f"Retrieved : {queryres}")
 
-    except:
-        logging.error("Reading from mongo failed")
-
-    return entry
+    return queryres

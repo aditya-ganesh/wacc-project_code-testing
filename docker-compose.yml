@@ -6,6 +6,7 @@ version: "3.6"
 
 
 
+
 services:
 
 
@@ -21,13 +22,13 @@ services:
             - "${RABBITMQ_DEFAULT_MGMT}:${RABBITMQ_DEFAULT_MGMT}"
 
     mongo:
-        image: mongodb
-        volumes:
-            - ./db/mongo-data:/data/db
-            - ./db/mongo-app:/var/www/html
-            - ./db/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+        image: mongo
+        hostname: mongo
         ports:
             - "${MONGODB_PORT}:${MONGODB_PORT}"
+        volumes:
+            # - "./db/mongo-data3:/data/db"
+            - "./db/mongo.key:/data/mongo.key"
         environment:
             - MONGO_INITDB_ROOT_USERNAME
             - MONGO_INITDB_ROOT_PASSWORD
@@ -38,17 +39,16 @@ services:
     dbinit:
         image: dbinit
         build:
-            context: ./dbinit
-            dockerfile: Dockerfile
+            context: .
+            dockerfile: ./dbinit/Dockerfile
+        depends_on:
+            - mongo
         environment:
             - MONGO_INITDB_ROOT_USERNAME
             - MONGO_INITDB_ROOT_PASSWORD
             - MONGODB_PORT
             - DROP_EXISTING
             - WRITE_CASES
-        depends_on:
-            - mongo
-
     web:
         image: web
         build:
@@ -56,43 +56,31 @@ services:
             dockerfile: Dockerfile
         environment:
             - APISERV_PORT
+        depends_on:
+            - rabbitmq
+        deploy:
+            replicas: 1
 
     nginx_rproxy:
         image: nginx_rproxy
         build: ./nginx_rproxy
+        deploy:
+            replicas: 1
         ports:
             - "${NGINX_PORT}:${NGINX_PORT}"
         depends_on:
             - web
-        
-
-    worker:
-        image: worker
-        build:
-            context: ./worker
-            dockerfile: Dockerfile
-        depends_on:
-            - rabbitmq
-            - mongo
-        environment:
-            - RABBITMQ_DEFAULT_USER
-            - RABBITMQ_DEFAULT_PASS
-            - RABBITMQ_DEFAULT_PORT
-            - MONGO_INITDB_ROOT_USERNAME
-            - MONGO_INITDB_ROOT_PASSWORD
-            - MONGODB_PORT
 
 
     apiserv:
         image: apiserv
         build:
-            context: ./apiserv
-            dockerfile: Dockerfile
+            context: .
+            dockerfile: ./apiserv/Dockerfile
         ports:
             - "${APISERV_PORT}:${APISERV_PORT}"
-        depends_on:
-            - worker
-            - mongo
+        deploy:
+            replicas: 1
         environment:
             - RABBITMQ_DEFAULT_USER
             - RABBITMQ_DEFAULT_PASS
@@ -102,7 +90,54 @@ services:
             - MONGODB_PORT
             - REFCODE_LENGTH
 
+    testcaller:
+        image: testcaller
+        build:
+            context: .
+            dockerfile: ./testcaller/Dockerfile
+        links:
+            - rabbitmq
+        deploy:
+            replicas: 2
+        environment:
+            - RABBITMQ_DEFAULT_USER
+            - RABBITMQ_DEFAULT_PASS
+            - RABBITMQ_DEFAULT_PORT
+            - MONGO_INITDB_ROOT_USERNAME
+            - MONGO_INITDB_ROOT_PASSWORD
+            - MONGODB_PORT
 
+    testrunner:
+        image: testrunner
+        build:
+            context: .
+            dockerfile: ./testrunner/Dockerfile
+        links:
+            - rabbitmq
+        deploy:
+            replicas: 2
+        environment:
+            - RABBITMQ_DEFAULT_USER
+            - RABBITMQ_DEFAULT_PASS
+            - RABBITMQ_DEFAULT_PORT
+            - MONGO_INITDB_ROOT_USERNAME
+            - MONGO_INITDB_ROOT_PASSWORD
+            - MONGODB_PORT
 
-
+    dbhandler:
+        image: dbhandler
+        build:
+            context: .
+            dockerfile: ./dbhandler/Dockerfile
+        links:
+            - rabbitmq
+        deploy:
+            replicas: 2
+        environment:
+            - RABBITMQ_DEFAULT_USER
+            - RABBITMQ_DEFAULT_PASS
+            - RABBITMQ_DEFAULT_PORT
+            - MONGO_INITDB_ROOT_USERNAME
+            - MONGO_INITDB_ROOT_PASSWORD
+            - MONGODB_PORT
 ...

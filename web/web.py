@@ -15,6 +15,7 @@ def upload_submission():
     assignments = requests.get(url=f'http://apiserv:{api_port}/getassignments/')
     assignments = assignments.json()
 
+    
     assignment_code = st.selectbox("Choose an assignment",assignments)
     uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
  
@@ -57,26 +58,51 @@ def view_result():
         res = requests.get(url=f'http://apiserv:{api_port}/getstatus/{code_id}')
         res = res.json()
 
-        if res['status'] == 0:
-            st.header('{} - {}'.format(res['code_id'],res['filename']))
-            st.code(res['code_lines'],language='python')
+        st.write(res)
 
-            test_results = res['execution']
+        if res is not None:
 
-            for i in range(len(test_results)):
+            st.header('{} - {}'.format(res['id'],res['filename']))
+            st.code(res['data'])
 
-                result = test_results[f'test case {i+1}']
-                if result['status'] != 'not_started':
-                    if result['retcode'] == 0:
-                        if result['status'] == 'successful':
-                            st.success(f"Case {i} : Passed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
+            if 'execution' in res.keys():
+                test_results = res['execution']
+                for i in range(len(test_results)):
+
+                    result = test_results[f'test case {i+1}']
+                    if result['status'] != 'not_started':
+                        if result['retcode'] == 0:
+                            if result['status'] == 'successful':
+                                st.success(f"Case {i} : Passed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
+                            else:
+                                st.warning(f"Case {i} : Failed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
                         else:
-                            st.warning(f"Case {i} : Failed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
+                            st.error(f'Case {i} : Execution failed. Traceback below')
+                            st.error(res['exec_output'])
                     else:
-                        st.error(f'Case {i} : Execution failed. Traceback below')
-                        st.error(res['exec_output'])
-                else:
-                    st.info(f"Case {i} : Pending execution")
+                        st.info(f"Case {i} : Pending execution")
+
+
+        # if res['status'] == 0:
+        #     st.header('{} - {}'.format(res['code_id'],res['filename']))
+        #     st.code(res['code_lines'],language='python')
+
+        #     test_results = res['execution']
+
+        #     for i in range(len(test_results)):
+
+        #         result = test_results[f'test case {i+1}']
+        #         if result['status'] != 'not_started':
+        #             if result['retcode'] == 0:
+        #                 if result['status'] == 'successful':
+        #                     st.success(f"Case {i} : Passed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
+        #                 else:
+        #                     st.warning(f"Case {i} : Failed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
+        #             else:
+        #                 st.error(f'Case {i} : Execution failed. Traceback below')
+        #                 st.error(res['exec_output'])
+        #         else:
+        #             st.info(f"Case {i} : Pending execution")
 
 
 if __name__ == '__main__':
