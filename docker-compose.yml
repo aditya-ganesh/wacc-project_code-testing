@@ -6,6 +6,7 @@ version: "3.6"
 
 
 
+
 services:
 
 
@@ -16,38 +17,58 @@ services:
             - RABBITMQ_DEFAULT_PASS
         ports:
             # AMQP protocol port
-            - "${RABBITMQ_DEFAULT_PORT}:${RABBITMQ_DEFAULT_PORT}"
+            - "${RABBITMQ_DEFAULT_PORT}:5672"
             # HTTP management UI
-            - "${RABBITMQ_DEFAULT_MGMT}:${RABBITMQ_DEFAULT_MGMT}"
+            - "${RABBITMQ_DEFAULT_MGMT}:15672"
 
-    mongo:
-        image: mongodb
-        volumes:
-            - ./db/mongo-data:/data/db
-            - ./db/mongo-app:/var/www/html
-            - ./db/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
-        ports:
-            - "${MONGODB_PORT}:${MONGODB_PORT}"
+    mongodb-primary:
+        image: 'bitnami/mongodb:latest'
         environment:
-            - MONGO_INITDB_ROOT_USERNAME
-            - MONGO_INITDB_ROOT_PASSWORD
-            - MONGODB_PORT
-            - DROP_EXISTING
-            - WRITE_CASES
+            - MONGODB_ADVERTISED_HOSTNAME=mongodb-primary
+            - MONGODB_REPLICA_SET_MODE=primary
+            - MONGODB_ROOT_PASSWORD=password123
+            - MONGODB_REPLICA_SET_KEY=replicasetkey123
+
+        volumes:
+            - 'mongodb_master_data:/bitnami'
+
+    mongodb-secondary:
+        image: 'bitnami/mongodb:latest'
+        depends_on:
+            - mongodb-primary
+        environment:
+            - MONGODB_ADVERTISED_HOSTNAME=mongodb-secondary
+            - MONGODB_REPLICA_SET_MODE=secondary
+            - MONGODB_INITIAL_PRIMARY_HOST=mongodb-primary
+            - MONGODB_INITIAL_PRIMARY_PORT_NUMBER
+            - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD
+            - MONGODB_REPLICA_SET_KEY
+
+    mongodb-arbiter:
+        image: 'bitnami/mongodb:latest'
+        depends_on:
+            - mongodb-primary
+        environment:
+            - MONGODB_ADVERTISED_HOSTNAME=mongodb-arbiter
+            - MONGODB_REPLICA_SET_MODE=arbiter
+            - MONGODB_INITIAL_PRIMARY_HOST=mongodb-primary
+            - MONGODB_INITIAL_PRIMARY_PORT_NUMBER
+            - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD
+            - MONGODB_REPLICA_SET_KEY
 
     dbinit:
         image: dbinit
         build:
-            context: ./dbinit
-            dockerfile: Dockerfile
-        environment:
-            - MONGO_INITDB_ROOT_USERNAME
-            - MONGO_INITDB_ROOT_PASSWORD
-            - MONGODB_PORT
-            - DROP_EXISTING
-            - WRITE_CASES
+            context: .
+            dockerfile: ./dbinit/Dockerfile
         depends_on:
-            - mongo
+            - mongodb-primary
+        environment:
+            - MONGODB_INITIAL_PRIMARY_PORT_NUMBER
+            - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD
+            - DROP_EXISTING
+            - APISERV_PORT
+
 
     web:
         image: web
@@ -56,53 +77,98 @@ services:
             dockerfile: Dockerfile
         environment:
             - APISERV_PORT
+        depends_on:
+            - rabbitmq
+        deploy:
+            replicas: 1
+
+    dashboard:
+        image: dashboard
+        build:
+            context: ./dashboard
+            dockerfile: Dockerfile
+        environment:
+            - APISERV_PORT
+
 
     nginx_rproxy:
-        image: nginx_rproxy
-        build: ./nginx_rproxy
+        image: bitnami/nginx
+        deploy:
+            replicas: 1
         ports:
             - "${NGINX_PORT}:${NGINX_PORT}"
         depends_on:
             - web
-        
-
-    worker:
-        image: worker
-        build:
-            context: ./worker
-            dockerfile: Dockerfile
-        depends_on:
-            - rabbitmq
-            - mongo
-        environment:
-            - RABBITMQ_DEFAULT_USER
-            - RABBITMQ_DEFAULT_PASS
-            - RABBITMQ_DEFAULT_PORT
-            - MONGO_INITDB_ROOT_USERNAME
-            - MONGO_INITDB_ROOT_PASSWORD
-            - MONGODB_PORT
+        volumes:
+            - ./nginx_rproxy/nginx.conf:/opt/bitnami/nginx/conf/server_blocks/nginx.conf:ro
 
 
     apiserv:
         image: apiserv
         build:
-            context: ./apiserv
-            dockerfile: Dockerfile
+            context: .
+            dockerfile: ./apiserv/Dockerfile
         ports:
             - "${APISERV_PORT}:${APISERV_PORT}"
-        depends_on:
-            - worker
-            - mongo
+        deploy:
+            replicas: 1
         environment:
             - RABBITMQ_DEFAULT_USER
             - RABBITMQ_DEFAULT_PASS
             - RABBITMQ_DEFAULT_PORT
-            - MONGO_INITDB_ROOT_USERNAME
-            - MONGO_INITDB_ROOT_PASSWORD
-            - MONGODB_PORT
+            - MONGODB_INITIAL_PRIMARY_PORT_NUMBER
+            - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD
             - REFCODE_LENGTH
 
+    testcaller:
+        image: testcaller
+        build:
+            context: .
+            dockerfile: ./testcaller/Dockerfile
+        links:
+            - rabbitmq
+        deploy:
+            replicas: 2
+        environment:
+            - RABBITMQ_DEFAULT_USER
+            - RABBITMQ_DEFAULT_PASS
+            - RABBITMQ_DEFAULT_PORT
+            - MONGODB_INITIAL_PRIMARY_PORT_NUMBER
+            - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD
 
+    testrunner:
+        image: testrunner
+        build:
+            context: .
+            dockerfile: ./testrunner/Dockerfile
+        links:
+            - rabbitmq
+        deploy:
+            replicas: 2
+        environment:
+            - RABBITMQ_DEFAULT_USER
+            - RABBITMQ_DEFAULT_PASS
+            - RABBITMQ_DEFAULT_PORT
+            - MONGODB_INITIAL_PRIMARY_PORT_NUMBER
+            - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD
 
+    dbhandler:
+        image: dbhandler
+        build:
+            context: .
+            dockerfile: ./dbhandler/Dockerfile
+        links:
+            - rabbitmq
+        deploy:
+            replicas: 2
+        environment:
+            - RABBITMQ_DEFAULT_USER
+            - RABBITMQ_DEFAULT_PASS
+            - RABBITMQ_DEFAULT_PORT
+            - MONGODB_INITIAL_PRIMARY_PORT_NUMBER
+            - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD
 
+volumes:
+  mongodb_master_data:
+    driver: local
 ...

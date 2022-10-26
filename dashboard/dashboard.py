@@ -21,7 +21,6 @@ async def upload_submission():
         assignments = assignments.json()
         assignment_code = st.selectbox("Choose an assignment",assignments)
     except:
-        st.warning("A connection to the database could not be established. You can still view the code you upload, but it will not be processed. Please try again later.")
         logging.warning("Could not fetch assignments")
     
 
@@ -99,20 +98,17 @@ async def print_test_cases(code_id):
             test_results = res['execution']
             for i in range(len(test_results)):
                 result = test_results[f'test case {i+1}']
-                if result['status'] == 'queued':
-                    test_containers[i].info(f"Case {i} : Queued")
-                elif result['status'] == 'timeout' :
-                    test_containers[i].error(f"Case {i} : Timed out.")
-                    pending_count[i] = 0
-                else:
+                if result['status'] != 'not_started':
                     if result['retcode'] == 0:
                         if result['status'] == 'successful':
                             test_containers[i].success(f"Case {i} : Passed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
                         else:
                             test_containers[i].warning(f"Case {i} : Failed\nExpected : {result['expected_output']}\tGot : {result['exec_output']}")
                     else:
-                        test_containers[i].error(f"Case {i} : Execution failed : {result['exec_output']}")
+                        test_containers[i].error(f"Case {i} : Execution failed. Traceback : {result['exec_output']}")
                     pending_count[i] = 0
+                else:
+                    test_containers[i].info(f"Case {i} : Pending execution")
         
         await asyncio.sleep(2)
 

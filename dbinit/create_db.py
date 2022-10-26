@@ -1,11 +1,10 @@
 from pymongo import MongoClient
 import os
+import logging
+import time
+import requests
 
-
-mongodb_user = os.environ['MONGO_INITDB_ROOT_USERNAME']
-mongodb_pass = os.environ['MONGO_INITDB_ROOT_PASSWORD']
-mongodb_port = os.environ['MONGODB_PORT']
-drop_existing = os.environ['DROP_EXISTING']
+api_port       = os.environ['APISERV_PORT']
 
 
 addition_cases = {
@@ -27,30 +26,24 @@ strrev = {
    'test_cases' : strrev_cases
 }
 
-def connectToMongo():
-    mongo_db = MongoClient('mongo',
-                                username=mongodb_user,
-                                password=mongodb_pass,
-                                )
-    return mongo_db
+payload={
+   1 : addition,
+   2 : strrev
+   }
 
 
-def initTestCaseCollection():
-   mongo_db = connectToMongo()
-   
-   db = mongo_db['CodeTesting']
-   test_cases = db['TestCases']
-   submissions = db['Submissions']
 
-   if drop_existing:
-      test_cases.drop()
-      submissions.drop()
+def initTestCaseCollection(payload):
+   res = requests.post(url=f'http://apiserv:{api_port}/sendfile',json=payload)
 
 
-   db.test_cases.insert_one(addition)
-   db.test_cases.insert_one(strrev)
-
-   mongo_db.close()
+def verifyWrite():
+   res = requests.get(url=f'http://apiserv:{api_port}/getassignments')
+   logging.warning(f"Received : {res.json()}")
 
 if __name__ == '__main__':
-   initTestCaseCollection()
+   initTestCaseCollection(payload)
+   verifyWrite()
+
+
+
