@@ -70,7 +70,19 @@ services:
             - APISERV_PORT
 
 
-    web:
+    web1:
+        image: web
+        build:
+            context: ./web
+            dockerfile: Dockerfile
+        environment:
+            - APISERV_PORT
+        depends_on:
+            - rabbitmq
+        deploy:
+            replicas: 1
+
+    web2:
         image: web
         build:
             context: ./web
@@ -87,8 +99,8 @@ services:
         build:
             context: ./dashboard
             dockerfile: Dockerfile
-        environment:
-            - APISERV_PORT
+        deploy:
+            replicas: 1
 
 
     nginx_rproxy:
@@ -97,10 +109,17 @@ services:
             replicas: 1
         ports:
             - "${NGINX_PORT}:${NGINX_PORT}"
+            - "81:81"
+
         depends_on:
-            - web
+            - web1
+            - web2
         volumes:
-            - ./nginx_rproxy/nginx.conf:/opt/bitnami/nginx/conf/server_blocks/nginx.conf:ro
+            - ./nginx_rproxy/web.conf:/opt/bitnami/nginx/conf/server_blocks/web.conf:ro
+            - ./nginx_rproxy/dashboard.conf:/opt/bitnami/nginx/conf/server_blocks/dashboard.conf:ro
+        healthcheck:
+            test: ["CMD", "nginx", "-s", "reload"]
+            interval: 2s
 
 
     apiserv:

@@ -16,6 +16,11 @@ async def upload_submission():
     assignment_code = None
 
     
+
+    
+
+    uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
+
     try:
         assignments = requests.get(url=f'http://apiserv:{api_port}/getassignments/',timeout=1)
         assignments = assignments.json()
@@ -23,9 +28,7 @@ async def upload_submission():
     except:
         st.warning("A connection to the database could not be established. You can still view the code you upload, but it will not be processed. Please try again later.")
         logging.warning("Could not fetch assignments")
-    
 
-    uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
  
     if uploaded_file is not None:
 

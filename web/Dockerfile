@@ -6,4 +6,4 @@ RUN pip install -r /data/requirements.txt
 
 COPY web.py /data/web.py
 
-ENTRYPOINT streamlit run /data/web.py
+ENTRYPOINT streamlit run /data/web.py  --server.port 80

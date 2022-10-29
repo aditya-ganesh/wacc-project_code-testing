@@ -65,7 +65,7 @@ async def get_assignments():
 
 
 @api_app.post("/initdb")
-def init_database(payload: dict = Body(...)):
+async def init_database(payload: dict = Body(...)):
     logging.info("Initialising DB from API call")
     mongo_db = connectToMongo()
     db = mongo_db['CodeTesting']
@@ -76,7 +76,7 @@ def init_database(payload: dict = Body(...)):
 
 
 @api_app.post("/sendfile")
-def send_file(submission: codeSubmission):
+async def send_file(submission: codeSubmission):
     logging.info(submission)
 
     code_id = ''.join(random.choices(string.ascii_uppercase,k=code_len))
@@ -124,7 +124,7 @@ def send_file(submission: codeSubmission):
 
 
 @api_app.get("/getstatus/{code_id}")
-def get_status(code_id):
+async def get_status(code_id):
     entry = {
         'status' : -1
     }
