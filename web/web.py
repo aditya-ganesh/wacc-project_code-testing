@@ -85,18 +85,22 @@ async def print_test_cases(code_id):
 
 
     test_containers = []
+    found = False
     test_cases_received = False
 
     while not test_cases_received:
 
         logging.info(f"Trying to read test cases for {code_id}")
 
-        res = requests.get(url=f'http://apiserv:{api_port}/getstatus/{code_id}')
-        res = res.json()
-
+        try:
+            res = requests.get(url=f'http://apiserv:{api_port}/getstatus/{code_id}')
+            res = res.json()
+            found = True
+        except:
+            st.error("Could not fetch test cases. Please try again later")
         # Get number of test cases to create placeholder values
 
-        if 'execution' in res.keys():
+        if found and 'execution' in res.keys():
             test_results = res['execution']
             if len(test_results) > 0:
                 test_cases_received = True
@@ -107,10 +111,14 @@ async def print_test_cases(code_id):
         
     pending_count = [1 for i in range(len(test_results))]
 
-    while sum(pending_count) > 0:
+    while test_cases_received and sum(pending_count) > 0:
 
-        res = requests.get(url=f'http://apiserv:{api_port}/getstatus/{code_id}')
-        res = res.json()
+        try:
+            res = requests.get(url=f'http://apiserv:{api_port}/getstatus/{code_id}')
+            res = res.json()
+        except:
+            st.error("Could not fetch test cases. Please try again later")
+            break
 
         if 'execution' in res.keys():
             test_results = res['execution']
@@ -133,7 +141,7 @@ async def print_test_cases(code_id):
         
         await asyncio.sleep(2)
 
-
+    return
 
 
 async def view_result():
