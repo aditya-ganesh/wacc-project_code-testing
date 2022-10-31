@@ -1,6 +1,7 @@
 import celery
 import os
 from pymongo import MongoClient
+import motor.motor_asyncio
 
 env = os.environ
 
@@ -28,8 +29,17 @@ def create_worker_from(WorkerClass, celery_config='celery_common.config'):
 
 def connectToMongo():
     mongo_db = MongoClient([f'mongodb-primary:{mongoport}',f'mongodb-secondary:{mongoport}',f'mongodb-arbiter:{mongoport}'],
-                                 replicaSet='replicaset',
-                                 username='root',
-                                 password=mongodb_pass,
-                                )
+                                replicaSet='replicaset',
+                                username='root',
+                                password=mongodb_pass,
+                            )
+    return mongo_db
+
+def connectToMongoAsync():
+
+    mongo_db = motor.motor_asyncio.AsyncIOMotorClient([f'mongodb-primary:{mongoport}',f'mongodb-secondary:{mongoport}',f'mongodb-arbiter:{mongoport}'],
+                                replicaSet='replicaset',
+                                username='root',
+                                password=mongodb_pass,
+                            )
     return mongo_db

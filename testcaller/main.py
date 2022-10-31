@@ -7,6 +7,7 @@ logging.basicConfig(level=logging.INFO)
 from pymongo import MongoClient
 
 
+
 class testCallerTaskImpl(testCallerTask):
 
     def run(self, payload):

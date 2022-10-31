@@ -9,9 +9,9 @@ import random
 import string
 
 from celery_common.tasks import testCallerTask, databaseHandlerTask
-from celery_common.utils import create_worker_from, connectToMongo
+from celery_common.utils import create_worker_from, connectToMongoAsync
 
-from pymongo import MongoClient
+# from pymongo import MongoClient
 
 logging.basicConfig(level=logging.INFO)
 
@@ -52,10 +52,10 @@ async def get_assignments():
     }
     logging.info(f"Reading mongo for assignments")
     # try:
-    mongo_db = connectToMongo()
+    mongo_db = connectToMongoAsync()
     db = mongo_db['CodeTesting']
     test_cases = db['TestCases']
-    queryres = db.test_cases.distinct('assignment')
+    queryres = await db.test_cases.distinct('assignment')
     logging.info(f"Retrieved : {queryres}")
     entry = queryres
     # except:
@@ -67,12 +67,12 @@ async def get_assignments():
 @api_app.post("/initdb")
 async def init_database(payload: dict = Body(...)):
     logging.info("Initialising DB from API call")
-    mongo_db = connectToMongo()
+    mongo_db = connectToMongoAsync()
     db = mongo_db['CodeTesting']
     test_cases = db['TestCases']
 
     for testcase in payload:
-        db.test_cases.insert_one(testcase)
+        await db.test_cases.insert_one(testcase)
 
 
 @api_app.post("/sendfile")
@@ -109,10 +109,10 @@ async def send_file(submission: codeSubmission):
     logging.info("Creating initial DB entry")
     
 
-    mongo_db = connectToMongo()
+    mongo_db = connectToMongoAsync()
     db = mongo_db['CodeTesting']
     submissions = db['Submissions']
-    db.submissions.insert_one(db_insert)
+    await db.submissions.insert_one(db_insert)
 
     logging.info("Sending test caller task to celery")
     test_caller.apply_async(args=[payload,])
@@ -130,11 +130,11 @@ async def get_status(code_id):
     }
     logging.info(f"Reading mongo for entry {code_id}")
    
-    mongo_db = connectToMongo()
+    mongo_db = connectToMongoAsync()
     db = mongo_db['CodeTesting']
     submissions = db['Submissions']
 
-    queryres = db.submissions.find_one({'id' : code_id})
+    queryres = await db.submissions.find_one({'id' : code_id})
     if queryres is not None:
         queryres.pop('_id')
     logging.info(f"Retrieved : {queryres}")

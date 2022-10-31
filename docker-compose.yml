@@ -108,7 +108,7 @@ services:
         deploy:
             replicas: 1
         ports:
-            - "${NGINX_PORT}:${NGINX_PORT}"
+            - "80:80"
             - "81:81"
 
         depends_on:
@@ -128,9 +128,9 @@ services:
             context: .
             dockerfile: ./apiserv/Dockerfile
         ports:
-            - "${APISERV_PORT}:${APISERV_PORT}"
+            - "${APISERV_PORT}"
         deploy:
-            replicas: 1
+            replicas: 2
         environment:
             - RABBITMQ_DEFAULT_USER
             - RABBITMQ_DEFAULT_PASS
@@ -147,6 +147,9 @@ services:
         links:
             - rabbitmq
         deploy:
+            update_config:
+                parallelism: 1
+                delay : 5s
             replicas: 2
         environment:
             - RABBITMQ_DEFAULT_USER
@@ -163,6 +166,9 @@ services:
         links:
             - rabbitmq
         deploy:
+            update_config:
+                parallelism: 1
+                delay : 5s
             replicas: 2
         environment:
             - RABBITMQ_DEFAULT_USER
@@ -179,6 +185,9 @@ services:
         links:
             - rabbitmq
         deploy:
+            update_config:
+                parallelism: 1
+                delay : 5s
             replicas: 2
         environment:
             - RABBITMQ_DEFAULT_USER
@@ -186,6 +195,7 @@ services:
             - RABBITMQ_DEFAULT_PORT
             - MONGODB_INITIAL_PRIMARY_PORT_NUMBER
             - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD
+
 
 volumes:
   mongodb_master_data:

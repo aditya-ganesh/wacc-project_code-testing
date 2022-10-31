@@ -4,3 +4,4 @@ celery
 python-multipart
 pydantic
 pymongo
+motor

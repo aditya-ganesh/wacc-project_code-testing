@@ -14,23 +14,35 @@ title_placeholder = st.empty()
 async def upload_submission():
 
     assignment_code = None
+    uploaded_file = None
 
-    
+    # uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
+    #
+    # try:
+    #     assignments = await requests.get(url=f'http://apiserv:{api_port}/getassignments/')
+    #     assignments = assignments.json()
+    #     assignment_code = st.selectbox("Choose an assignment",assignments)
+    # except:
+    #     st.warning("A connection to the database could not be established. You can still view the code you upload, but it will not be processed. Please try again later.")
+    #     logging.warning("Could not fetch assignments")
 
-    
+    with st.form("CodeSubmission"):
+        uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
 
-    uploaded_file = st.file_uploader("Choose a Python script file",accept_multiple_files=False)
+        assignment_container = st.empty()
+        assignment_container.info("Fetching list of assignments from the database")
 
-    try:
-        assignments = requests.get(url=f'http://apiserv:{api_port}/getassignments/',timeout=1)
-        assignments = assignments.json()
-        assignment_code = st.selectbox("Choose an assignment",assignments)
-    except:
-        st.warning("A connection to the database could not be established. You can still view the code you upload, but it will not be processed. Please try again later.")
-        logging.warning("Could not fetch assignments")
+        try:
+            assignments = requests.get(url=f'http://apiserv:{api_port}/getassignments/',timeout=3)
+            assignments = assignments.json()
+            assignment_code = assignment_container.selectbox("Choose an assignment",assignments)
+        except:
+            assignment_container.warning("A connection to the database could not be established. You can still view the code you upload, but it will not be processed. Please try again later.")
+            logging.warning("Could not fetch assignments")
 
+        submitted = st.form_submit_button("Submit")
  
-    if uploaded_file is not None:
+    if uploaded_file is not None and submitted:
 
         code_lines = uploaded_file.read()
         code_lines = code_lines.decode("utf-8")
@@ -41,7 +53,7 @@ async def upload_submission():
         payload = {
             'assignment'    : assignment_code,
             'filename'      : uploaded_file.name,
-            'data'          : code_lines             
+            'data'          : code_lines
         }
 
 
@@ -54,10 +66,10 @@ async def upload_submission():
                 ret = res.json()
 
                 if ret['status'] == 0:
-                    
+
                     st.success(f"File uploaded! Your reference ID is **{ret['id']}**")
-                    
-                    test_placeholder = st.container()
+
+                    st.header("Test Case Execution")
                     await print_test_cases(ret['id'])
 
                 else:
@@ -74,8 +86,10 @@ async def print_test_cases(code_id):
 
     test_containers = []
     test_cases_received = False
-    
+
     while not test_cases_received:
+
+        logging.info(f"Trying to read test cases for {code_id}")
 
         res = requests.get(url=f'http://apiserv:{api_port}/getstatus/{code_id}')
         res = res.json()
@@ -88,8 +102,8 @@ async def print_test_cases(code_id):
                 test_cases_received = True
                 for i in range(len(test_results)):
                     test_containers.append(st.empty())
-            else:
-                await asyncio.sleep(0.5)
+        else:
+            await asyncio.sleep(1)
         
     pending_count = [1 for i in range(len(test_results))]
 

@@ -4,10 +4,6 @@ from celery_common.utils import create_worker_from, connectToMongo
 import logging
 logging.basicConfig(level=logging.INFO)
 
-from pymongo import MongoClient
-
-
-
 class databaseHandlerTaskImpl(databaseHandlerTask):
 
     def run(self, payload):
